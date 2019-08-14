@@ -3,7 +3,7 @@
 Plugin Name: 高博的世界
 Description: 高博的世界专用WordPress插件
 Author: 高博
-Version: 1.0.0
+Version: 1.0.1
 Author URI: http://gao.bo
 */
 /* Start Adding Functions Below this Line */
@@ -39,8 +39,7 @@ class links_displayer extends WP_Widget {
             $specified = '';
             $title = '友情链接';
         }
-        $bmcats = get_terms('link_category');
-        if( $bmcats )
+        if( $bmcats = get_terms(array('taxomony'=>'link_category', 'hide_empty'=>true)) )
         {
             printf(
                 '<select multiple="multiple" name="%s[]" id="%s" class="widefat" size="%d">',
@@ -59,8 +58,9 @@ class links_displayer extends WP_Widget {
             }
             echo '</select>';
         }
-        else
-            echo '没有任何链接分类目录';
+        else {
+            echo '不存在任何非空链接分类目录！';
+        }
         echo '<input type="checkbox" id="' . $this->get_field_id('specified') .  '" name="' . $this->get_field_name('specified')
             . (($specified == '') ? '">' : '" checked>');
         echo '<label for="' . $this->get_field_id('title') . '">指定统一标题</label>';
@@ -78,26 +78,33 @@ class links_displayer extends WP_Widget {
     }
 
     function widget( $args, $instance ) {
+        $nocontent = false;
         if ((!empty($instance['specified'])) && (!empty($instance['title']))){
             $title = apply_filters( 'widget_title', $instance['title'] );
+        } else if (count($instance['select']) > 0) {
+            $bmcat = get_term_by("id", intval($instance['select'][array_rand($instance['select'])]), 'link_category');
+            $title = $bmcat->name;
+        } else if ($allbmcats = get_terms(array('taxomony'=>'link_category', 'hide_empty'=>true))) {
+            $bmcat = $allbmcats[array_rand($allbmcats)];
+            $title = $bmcat->name;
         } else {
-            $pick = intval($instance['select'][array_rand($instance['select'])]);
-            $bmcats = get_terms('link_category');
-            foreach ($bmcats as $bmcat){
-                if ($pick == $bmcat->term_id){
-                    $title = $bmcat->name;
-                    break;
-                }
+            $title = '很遗憾……';
+            $nocontent = true;
+        }
+        echo $args['before_widget'] . $args['before_title'] . $title . $args['after_title'];
+        if ($nocontent){
+            echo '不存在任何非空链接分类目录！';
+        } else {
+            echo '<ul>';
+            foreach (get_bookmarks( array("category" => intval($bmcat->term_id))) as $bmitem){
+                echo '<li><a href="' . $bmitem->link_url
+                    . ((empty($bmitem->link_target)) ? '"' : ('" target="' . $bmitem->link_target))
+                    . ((empty($bmitem->link_description)) ? '">' : ('" title="' . $bmitem->link_description . '">'))
+                    . $bmitem->link_name . '</a></li>';
             }
+            echo '</ul>';
         }
-        echo $args['before_widget'] . $args['before_title'] . $title . $args['after_title'] . '<ul>';
-        foreach (get_bookmarks( array("category" => $pick)) as $bmitem){
-            echo '<li><a href="' . $bmitem->link_url
-                . ((empty($bmitem->link_target)) ? '"' : ('" target="' . $bmitem->link_target))
-                . ((empty($bmitem->link_description)) ? '">' : ('" title="' . $bmitem->link_description . '">'))
-                . $bmitem->link_name . '</a></li>';
-        }
-        echo '</ul>' . $args['after_widget'];
+        echo $args['after_widget'];
     }
 }
 
